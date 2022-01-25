@@ -1,0 +1,71 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin
+
+# Test binary, build with `go test -c`
+*.test
+
+# Output of the test and coverage results
+reports/
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+*.html
+
+# Other
+*.local
+
+bin/
+vendor/
+downloads/
+node_modules/
+coverage.txt
+report.xml
+cover.out
+cover.html
+coverage.json
+coverage.xml
+testlogs.txt
+.DS_Store
+
+# Kubernetes Generated files - skip generated files, except for vendored files
+
+!vendor/**/zz_generated.*
+
+# editor and IDE paraphernalia
+.idea
+*.swp
+*.swo
+*~
+.env
+__debug_bin
+.vscode
+cover-existing.html
+coverage-existing.txt
+report-existing.xml
+testlogs-existing.txt
+
+
+pkg/compose/outputjk.yaml
+outputjk.yaml
+examples/test.txt
+data/pr_day_ACCESS1-0_historical_r1i1p1_20000101-20051231.nc
+examples/product/example/ffdi_for_region/orders/
+data/pr_day_ACCESS1-0_historical_r1i1p1_20000101-20051231.nc
+pkg/metadata/auth.json
+
+systemdata/
+
+
+config.env
+
+gosftpsync
+gosftpsync.exe
+
+archive
+download
+gosftpsync.log

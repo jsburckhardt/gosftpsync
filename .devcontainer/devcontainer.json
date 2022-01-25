@@ -1,0 +1,85 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the README at:
+// https://github.com/microsoft/vscode-dev-containers/tree/v0.208.0/containers/go
+{
+	"name": "gosftpsync",
+	"build": {
+		"dockerfile": "Dockerfile",
+		"args": {
+			// Update the VARIANT arg to pick a version of Go: 1, 1.16, 1.17
+			// Append -bullseye or -buster to pin to an OS version.
+			// Use -bullseye variants on local arm64/Apple Silicon.
+			"VARIANT": "1.17-bullseye",
+			// Options
+			"NODE_VERSION": "lts/*"
+		}
+	},
+	"runArgs": [ "--cap-add=SYS_PTRACE", "--security-opt", "seccomp=unconfined","--network=host" ],
+
+	// Set *default* container specific settings.json values on container create.
+	"settings": {
+        "terminal.integrated.defaultProfile.linux": "zsh",
+		"go.toolsManagement.checkForUpdates": "local",
+		"go.useLanguageServer": true,
+		"go.gopath": "/go",
+        "go.lintTool": "golangci-lint",
+		"go.goroot": "/usr/local/go",
+		"go.lintFlags": [
+            "--fast"
+        ],
+        "[go]": {
+            "editor.formatOnSave": true,
+            "editor.codeActionsOnSave": {
+                "source.organizeImports": true,
+            },
+            // Optional: Disable snippets, as they conflict with completion ranking.
+            "editor.snippetSuggestions": "bottom",
+        },
+        "[go.mod]": {
+            "editor.formatOnSave": true,
+            "editor.codeActionsOnSave": {
+                "source.organizeImports": true,
+            },
+        },
+        "gopls": {
+            // Add parameter placeholders when completing a function.
+            "usePlaceholders": true,
+            // If true, enable additional analyses with staticcheck.
+            // Warning: This will significantly increase memory usage.
+            "staticcheck": false,
+        }
+	},
+
+	// Add the IDs of extensions you want installed when the container is created.
+	"extensions": [
+		"IBM.output-colorizer",
+        "adamhartford.vscode-base64",
+        "davidanson.vscode-markdownlint",
+        "eamodio.gitlens",
+        "eriklynd.json-tools",
+        "golang.go",
+        "ms-vscode.go",
+        "oderwat.indent-rainbow",
+        "saekiraku.pin-up",
+        "searking.preview-vscode",
+        "shardulm94.trailing-spaces",
+	],
+
+	// Use 'forwardPorts' to make a list of ports inside the container available locally.
+	// "forwardPorts": [],
+
+	// Use 'postCreateCommand' to run commands after the container is created.
+    "postCreateCommand": "go mod download",
+
+
+	// Comment out connect as root instead. More info: https://aka.ms/vscode-remote/containers/non-root.
+	"remoteUser": "vscode",
+	"features": {
+		"docker-from-docker": "latest",
+		"kubectl-helm-minikube": "latest",
+		"git": "latest"
+	},
+	"mounts": [
+        "source=${env:HOME}${env:USERPROFILE}/.ssh,target=/root/.ssh,type=bind,readonly",
+        "source=gosftpsync-zshhistory,target=/commandhistory,type=volume"
+    ]
+}

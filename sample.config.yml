@@ -1,0 +1,6 @@
+sftpconfig:
+  archivepath: "./archive"
+  downloadpath: "./download"
+  connectionstringenvvar: "SFTPTOGO_URL"
+  readpath: "Upload/Processed/"
+  verbose: true
