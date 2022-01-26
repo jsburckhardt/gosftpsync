@@ -139,7 +139,7 @@ func main() {
 	}
 
 	if verbose {
-		iLog.Println("VERBOSE: Finished Listing archived files")
+		iLog.Printf("VERBOSE: Finished Listing %d archived files", len(archivedFiles))
 	}
 
 	if verbose {
@@ -189,9 +189,20 @@ func listSFTPFiles(sc sftp.Client, remoteDir string) (SFTPList []fs.FileInfo, er
 		return nil, err
 	}
 	if verbose {
-		iLog.Println("VERBOSE: finished listing sftp files")
+		iLog.Printf("VERBOSE: finished listing %d sftp files", len(files))
+	}
+	// ignoring directories
+	for i, file := range files {
+		if file.IsDir() {
+			iLog.Printf("VERBOSE: Removing directory from list %s\n", file.Name())
+			files = remove(files, i)
+		}
 	}
 	return files, nil
+}
+
+func remove(files []fs.FileInfo, i int) []fs.FileInfo {
+	return append(files[:i], files[i+1:]...)
 }
 
 // compare files in two directories
