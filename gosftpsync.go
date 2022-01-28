@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"io/ioutil"
 	"log"
 	"net/url"
 	"os"
@@ -58,8 +57,9 @@ func main() {
 		iLog.Println("VERBOSE: post read config")
 	}
 
+	// Package starts
 	start := time.Now()
-	iLog.Printf("Starting gosftpsync at %s\n", start)
+	iLog.Printf("Starting gosftpsync at %v\n", start)
 
 	if verbose {
 		iLog.Println("VERBOSE: Loading environment variable")
@@ -121,36 +121,36 @@ func main() {
 	}
 	defer sc.Close()
 
-	// list files
+	// list Processed files
 	if verbose {
-		iLog.Println("VERBOSE: Listing sftp files")
+		iLog.Println("VERBOSE: Listing processed sftp files")
 	}
-	SFTPFiles, err := listSFTPFiles(*sc, cfg.SFTPConfig.ReadPath)
+	processedSFTPFiles, err := listSFTPFiles(*sc, cfg.SFTPConfig.ReadPath)
 	if err != nil {
-		iLog.Fatalf("Error listing files: %v\n", err)
+		iLog.Fatalf("Error listing processed sftp files. Err: %v\n", err)
 	}
 
 	if verbose {
-		iLog.Println("VERBOSE: Listing archived files")
+		iLog.Printf("VERBOSE: Finished Listing %d processed sftp files", len(processedSFTPFiles))
 	}
-	archivedFiles, err := ioutil.ReadDir(cfg.SFTPConfig.ArchivedPath)
+	archivedSFTPFiles, err := listSFTPFiles(*sc, cfg.SFTPConfig.ArchivedPath)
 	if err != nil {
-		iLog.Fatalf("Error listing archived files in path: %s. Err: %s\n", cfg.SFTPConfig.ArchivedPath, err)
+		iLog.Fatalf("Error listing archived sftp files. Err: %s\n", err)
 	}
 
 	if verbose {
-		iLog.Printf("VERBOSE: Finished Listing %d archived files", len(archivedFiles))
+		iLog.Printf("VERBOSE: Finished Listing %d archived sftp files", len(archivedSFTPFiles))
 	}
 
 	if verbose {
 		iLog.Println("VERBOSE: Getting diff files")
 	}
-	filesToDownload := getDiffFileNames(SFTPFiles, archivedFiles)
+	filesToDownload := getDiffFileNames(processedSFTPFiles, archivedSFTPFiles)
 	iLog.Printf("Found %v new files. Downloading\n", len(filesToDownload))
 	if verbose {
 		iLog.Println("VERBOSE: starting to download files")
 	}
-	err = downloadFiles(*sc, filesToDownload, cfg.SFTPConfig.ReadPath, cfg.SFTPConfig.DownloadPath)
+	err = downloadFiles(*sc, filesToDownload, cfg.SFTPConfig.ReadPath, cfg.SFTPConfig.ArchivedPath, cfg.SFTPConfig.DownloadPath)
 
 	if err != nil {
 		iLog.Fatalf("Failed downloading files. Err: %s\n", err)
@@ -188,9 +188,6 @@ func listSFTPFiles(sc sftp.Client, remoteDir string) (SFTPList []fs.FileInfo, er
 	if err != nil {
 		return nil, err
 	}
-	if verbose {
-		iLog.Printf("VERBOSE: finished listing %d sftp files", len(files))
-	}
 	// ignoring directories
 	for i, file := range files {
 		if file.IsDir() {
@@ -206,13 +203,13 @@ func remove(files []fs.FileInfo, i int) []fs.FileInfo {
 }
 
 // compare files in two directories
-func getDiffFileNames(SFTPFiles, archivedFiles []fs.FileInfo) []string {
-	archived := make(map[string]struct{}, len(archivedFiles))
-	for _, af := range archivedFiles {
+func getDiffFileNames(processedSFTPFiles, archivedSFTPFiles []fs.FileInfo) []string {
+	archived := make(map[string]struct{}, len(archivedSFTPFiles))
+	for _, af := range archivedSFTPFiles {
 		archived[af.Name()] = struct{}{}
 	}
 	var diff []string
-	for _, nf := range SFTPFiles {
+	for _, nf := range processedSFTPFiles {
 		if _, found := archived[nf.Name()]; !found {
 			diff = append(diff, nf.Name())
 		}
@@ -224,40 +221,60 @@ func getDiffFileNames(SFTPFiles, archivedFiles []fs.FileInfo) []string {
 	return diff
 }
 
-func downloadFiles(sc sftp.Client, files []string, readPath, downloadPath string) (err error) {
-	for _, name := range files {
-		err = downloadFile(sc, fmt.Sprintf("%s/%s", readPath, name), fmt.Sprintf("%s/%s", downloadPath, name))
+func downloadFiles(sc sftp.Client, files []string, remoteReadPath, remoteArchivePath, downloadPath string) (err error) {
+	for i, fileName := range files {
+		iLog.Printf("Working on file %d of %d", i+1, len(files))
+		err = downloadRemoteFile(sc, fmt.Sprintf("%s/%s", remoteReadPath, fileName), fmt.Sprintf("%s/%s", downloadPath, fileName))
+		if err != nil {
+			return err
+		}
+		err = archiveRemoteFile(sc, fmt.Sprintf("%s/%s", remoteArchivePath, fileName), fmt.Sprintf("%s/%s", remoteReadPath, fileName))
 		if err != nil {
 			return err
 		}
 	}
-	return nil
+	return
 }
 
 // Download file from sftp server
-func downloadFile(sc sftp.Client, remoteFile, localFile string) (err error) {
+func downloadRemoteFile(sc sftp.Client, remoteReadFile, localFile string) (err error) {
 
-	srcFile, err := sc.OpenFile(remoteFile, (os.O_RDONLY))
+	//  Open file in sftp server
+	srcFile, err := sc.OpenFile(remoteReadFile, (os.O_RDONLY))
 	if err != nil {
-		iLog.Fatalf("Unable to open remote file: %v\n", err)
-		return err
+		return fmt.Errorf("Unable to open remote file: %v\n", err)
+
 	}
 	defer srcFile.Close()
 
-	dstFile, err := os.Create(localFile)
+	// create local file
+	dstLocalFile, err := os.Create(localFile)
 	if err != nil {
-		iLog.Fatalf("Unable to open local file: %v\n", err)
-		return err
-	}
-	defer dstFile.Close()
+		return fmt.Errorf("Unable to open local file: %v\n", err)
 
-	_, err = io.Copy(dstFile, srcFile)
+	}
+	defer dstLocalFile.Close()
+
+	// copy file from sftp to localfile
+	_, err = io.Copy(dstLocalFile, srcFile)
 	if err != nil {
-		iLog.Fatalf("Unable to copy remote file: %v\n", err)
-		return err
+		return fmt.Errorf("Unable to copy remote file: %v\n", err)
+	}
+
+	if verbose {
+		iLog.Printf("VERBOSE: finished processing file %v\n", localFile)
+	}
+	return
+}
+
+// Archive file in sftp server
+func archiveRemoteFile(sc sftp.Client, remoteArchiveFile, remoteReadName string) (err error) {
+	err = sc.Rename(remoteReadName, remoteArchiveFile)
+	if err != nil {
+		return fmt.Errorf("Unable to move remote file: %v\n", err)
 	}
 	if verbose {
-		iLog.Println("VERBOSE: finished downloading file")
+		iLog.Printf("VERBOSE: finished moving file %v\n", remoteReadName)
 	}
 	return
 }
